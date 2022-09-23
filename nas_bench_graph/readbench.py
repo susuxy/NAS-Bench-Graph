@@ -1,8 +1,8 @@
 import pickle
-from architecture import all_archs
+from nas_bench_graph.architecture import all_archs
 
 def light_read(dname):
-    f = open("light/{}.bench".format(dname), "rb")
+    f = open("nas_bench_graph/light/{}.bench".format(dname), "rb")
     bench = pickle.load(f)
     f.close()
     return bench
