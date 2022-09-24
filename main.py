@@ -11,9 +11,11 @@ from sklearn.metrics import r2_score, mean_squared_error
 import matplotlib.pyplot as plt 
 import os
 import logging
+from args_loader import load_args
 
+args = load_args()
 
-dataset_name = 'arxiv'
+dataset_name = args.data
 
 bench = light_read(dataset_name)
 
@@ -24,6 +26,7 @@ logger.addHandler(handler)
 with open(dataset_name + '.log', 'w') as f:
     pass
 
+logger.info(args)
 
 def read_data(file_name):
     df_file_path = os.path.join('nas_bench_graph', 'save_df', file_name + '.pkl')
@@ -48,7 +51,7 @@ def read_data(file_name):
         df.to_pickle(df_file_path)
     return df
 
-df_total = read_data('arxiv')
+df_total = read_data(dataset_name)
 logger.info(f"total dataframe size is {df_total.shape}")
 
 
