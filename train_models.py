@@ -12,6 +12,7 @@ import xgboost
 from sklearn.metrics import r2_score, mean_squared_error
 import matplotlib.pyplot as plt
 import time
+from scipy import stats
 
 class ML_model:
     def __init__(self, args):
@@ -41,6 +42,7 @@ class ML_model:
         
         # data split
         col_names_x = [col for col in self.df if col.startswith('in') or col.startswith('op') or col.startswith('dataset')]
+        # col_names_x = [col for col in self.df if col.startswith('in') or col.startswith('op')]
         col_names_x = col_names_x + ['params', 'layers']
         col_names_y = ['test_acc']
         self.split_dataset(col_names_x, col_names_y, random_seed=self.args.random_seed)
@@ -132,13 +134,37 @@ class ML_model:
 
     def model_results(self):
         self.model_testing()
+        self.plot_rank_spearman()
         r2 = r2_score(self.y_test, self.y_pred)
         mse = mean_squared_error(self.y_test, self.y_pred)
         self.logger.info(f"R2 score {r2:.7f}")
         self.logger.info(f"MSE score {mse:.7f}")
         self.result = [r2, mse]
 
-    def plot_feat_importance(self, feat_names, plot_save_path='importance.png', feat_num=5):
+    def plot_rank_spearman(self):
+        x,y = self.y_pred, self.y_test
+        score_path = os.path.join('spearman_plot', '_'.join(self.args.data) + '_score.png')
+        rank_path = os.path.join('spearman_plot', '_'.join(self.args.data) + '_rank.png')
+        rank_x = stats.rankdata(x)
+        rank_y = stats.rankdata(y)
+        spearman_corr, pvalue = stats.spearmanr(rank_x, rank_y)
+
+        plt.figure()
+        plt.scatter(x, y, s=2)
+        plt.xlabel("y_pred")
+        plt.ylabel("y_true")
+        plt.show()
+        plt.savefig(score_path)
+
+        plt.figure()
+        plt.scatter(rank_x, rank_y, s=2)
+        plt.xlabel("rank_y_pred")
+        plt.ylabel("rank_y_true")
+        plt.show()
+        plt.savefig(rank_path)
+        self.logger.info(f"Spearman corr is {spearman_corr}, num_samples is {len(rank_x)}")
+
+    def plot_feat_importance(self, feat_names, feat_num=5):
         plot_save_path = '_'.join(self.args.data) + '_importance.png'
         feat_important = self.model.feature_importances_
 
