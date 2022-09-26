@@ -37,19 +37,35 @@ def read_data(file_name):
         # contruct dataframe
         bench = light_read(file_name)
         print(f"bench information is {bench[list(bench.keys())[0]].keys()}")
-        df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 
-        'op_1', 'op_2', 'op_3', 'params', 'latency', 'valid_acc', 'test_acc'])
-        for key_idx in tqdm(bench):
-            info = bench[key_idx]
-            structure = key2structure(key_idx)
-            sample = []
-            sample += structure[0]
-            sample += structure[1]
+        if args.data_type == 'short':
+            df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 
+            'op_1', 'op_2', 'op_3', 'params', 'latency', 'valid_acc', 'test_acc'])
+            for key_idx in tqdm(bench):
+                info = bench[key_idx]
+                structure = key2structure(key_idx)
+                sample = []
+                sample += structure[0]
+                sample += structure[1]
 
-            bench_sample = [info['para'], info['latency'], info['valid_perf'], info['perf']]
-            sample += bench_sample
+                bench_sample = [info['para'], info['latency'], info['valid_perf'], info['perf']]
+                sample += bench_sample
 
-            df.loc[df.shape[0]] = sample
+                df.loc[df.shape[0]] = sample
+        elif args.data_type == 'complete':
+            df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 
+            'op_1', 'op_2', 'op_3', 'params', 'latency', 'test_acc'])
+            for key_idx in tqdm(bench):
+                info = bench[key_idx]
+                structure = key2structure(key_idx)
+                sample = []
+                sample += structure[0]
+                sample += structure[1]
+
+                bench_sample = [info['para'], info['latency'], info['perf']]
+                sample += bench_sample
+
+                df.loc[df.shape[0]] = sample
+
         df.to_pickle(df_file_path)
     return df
 
