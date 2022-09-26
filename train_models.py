@@ -19,11 +19,13 @@ class ML_model:
         self.log_initialize()
         
     def log_initialize(self):
+        log_file_name = '_'.join(self.args.data)
+
         logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        handler = logging.FileHandler(self.args.data + '.log')
+        handler = logging.FileHandler(log_file_name + '.log')
         self.logger.addHandler(handler)
-        with open(self.args.data + '.log', 'w') as f:
+        with open(log_file_name + '.log', 'w') as f:
             pass
         self.logger.info(self.args)
 
@@ -61,30 +63,16 @@ class ML_model:
 
 
     def read_data(self):
-        df_file_path = os.path.join('nas_bench_graph', 'save_df', self.args.data + '.pkl')
-        if os.path.exists(df_file_path):
-            df = pd.read_pickle(df_file_path)
-        else:
-            # contruct dataframe
-            bench = light_read(self.args.data)
-            print(f"bench information is {bench[list(bench.keys())[0]].keys()}")
-            if self.args.data_type == 'short':
-                df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 
-                'op_1', 'op_2', 'op_3', 'params', 'latency', 'valid_acc', 'test_acc'])
-                for key_idx in tqdm(bench):
-                    info = bench[key_idx]
-                    structure = key2structure(key_idx)
-                    sample = []
-                    sample += structure[0]
-                    sample += structure[1]
-
-                    bench_sample = [info['para'], info['latency'], info['valid_perf'], info['perf']]
-                    sample += bench_sample
-
-                    df.loc[df.shape[0]] = sample
-            elif self.args.data_type == 'complete':
-                df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 
-                'op_1', 'op_2', 'op_3', 'params', 'latency', 'test_acc'])
+        df_list = []
+        for each_file_name in self.args.data:
+            df_file_path = os.path.join('nas_bench_graph', 'save_df', each_file_name + '.pkl')
+            if os.path.exists(df_file_path):
+                df = pd.read_pickle(df_file_path)
+            else:
+                # contruct dataframe
+                bench = light_read(each_file_name)
+                print(f"for dataset {each_file_name}, bench information is {bench[list(bench.keys())[0]].keys()}")
+                df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3', 'params', 'latency', 'test_acc'])
                 for key_idx in tqdm(bench):
                     info = bench[key_idx]
                     structure = key2structure(key_idx)
@@ -96,12 +84,13 @@ class ML_model:
                     sample += bench_sample
 
                     df.loc[df.shape[0]] = sample
-
-            df.to_pickle(df_file_path)
+                df.to_pickle(df_file_path)
+            df_list.append(df)
+        
+        df = pd.concat(df_list)
         self.df = df
         self.logger.info(f"total dataframe column names {df.columns}")
         self.logger.info(f"total dataframe size is {df.shape}")
-        # return df
 
     def category_label_encode(self, col_names):
         # category label encoding
