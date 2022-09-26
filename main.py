@@ -1,3 +1,4 @@
+from socketserver import ForkingMixIn
 from nas_bench_graph.readbench import light_read
 from nas_bench_graph.architecture import Arch
 import pandas as pd
@@ -35,6 +36,7 @@ def read_data(file_name):
     else:
         # contruct dataframe
         bench = light_read(file_name)
+        print(f"bench information is {bench[list(bench.keys())[0]].keys()}")
         df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 
         'op_1', 'op_2', 'op_3', 'params', 'latency', 'valid_acc', 'test_acc'])
         for key_idx in tqdm(bench):
@@ -52,6 +54,7 @@ def read_data(file_name):
     return df
 
 df_total = read_data(dataset_name)
+logger.info(f"total dataframe column names {df_total.columns}")
 logger.info(f"total dataframe size is {df_total.shape}")
 
 
@@ -71,14 +74,17 @@ def category_label_encode(df, origin_col_names, output_col_names):
     return df, le
 
 
-df_total, le_ops = category_label_encode(df_total, ['op_0', 'op_1', 'op_2', 'op_3'], ['op_0_encode', 'op_1_encode', 'op_2_encode', 'op_3_encode'])
 
 # one-hot label encoding
-# df = pd.get_dummies(df, prefix=['in_0', 'in_1', 'in_2', 'in_3'], columns=['in_0', 'in_1', 'in_2', 'in_3'])
-# df = pd.get_dummies(df, prefix=['op_0', 'op_1', 'op_2', 'op_3'], columns=['op_0', 'op_1', 'op_2', 'op_3'])
+def one_hot_label_encode(df, one_hot_column_names):
+    df = pd.get_dummies(df, prefix = one_hot_column_names, columns=one_hot_column_names)
+    return df
 
-
-
+if args.encode == 'category':
+    df_total, le_ops = category_label_encode(df_total, ['op_0', 'op_1', 'op_2', 'op_3'], ['op_0', 'op_1', 'op_2', 'op_3'])
+elif args.encode == 'one_hot':
+    one_hot_col = ['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3']
+    df_total = one_hot_label_encode(df_total, one_hot_col)
 
 
 
@@ -90,7 +96,11 @@ def split_dataset(df, feat_col_name, pred_col_name, test_size, random_seed):
         X, y, test_size=test_size, random_state=random_seed
     )
 
-col_names_x = ['in_0', 'in_1', 'in_2', 'in_3', 'op_0_encode', 'op_1_encode', 'op_2_encode', 'op_3_encode', 'params']
+
+col_name_in_op = [col for col in df_total if col.startswith('in') or col.startswith('op')]
+col_names_x = col_name_in_op + ['params']
+
+# col_names_x = ['in_0', 'in_1', 'in_2', 'in_3', 'op_0_encode', 'op_1_encode', 'op_2_encode', 'op_3_encode', 'params']
 col_names_y = ['test_acc']
 X_train, X_test, y_train, y_test = split_dataset(df_total, col_names_x, col_names_y, 0.2, 13)
 logger.info(f"training data size for X and y is {X_train.shape} and {y_train.shape}")
@@ -122,21 +132,28 @@ def model_results(model, X, y_true):
     return r2, mse
 
 r2, mse = model_results(model, X_test.values, y_test)
-print([r2, mse])
+# print([r2, mse])
 logger.info(f"R2 score {r2:.7f}")
 logger.info(f"MSE score {mse:.7f}")
 
 
 def plot_feat_importance(model, feat_names, plot_save_path):
     feat_important = model.feature_importances_
-    plt.figure()
+
+    zipped_list = zip(feat_important, feat_names)
+    sorted_zip_list = sorted(zipped_list, reverse=True)
+    tuples = zip(*sorted_zip_list)
+    feat_important_sort, feat_names_sort = [list(t) for t in tuples]
+    logger.info(f"five most important features {feat_names_sort[:5]}")
+
+    plt.figure(figsize=(16, 9))
     plt.bar(feat_names, feat_important)
     plt.title('feature importance')
     plt.xlabel('feature name')
     plt.ylabel('importance scores')
     plt.savefig(plot_save_path)
 
-all_feats = ['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3', 'params']
-plot_feat_importance(model, all_feats, 'importance.png')
+# all_feats = ['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3', 'params']
+plot_feat_importance(model, col_names_x, 'importance.png')
 
 
