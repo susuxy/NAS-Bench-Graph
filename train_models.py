@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from nas_bench_graph.readbench import light_read
 from tqdm import tqdm
-from utils import key2structure
+from utils import key2structure, dataset2info
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 import logging
@@ -40,10 +40,10 @@ class ML_model:
             self.one_hot_label_encode(category_col_names)
         
         # data split
-        col_names_x = [col for col in self.df if col.startswith('in') or col.startswith('op')]
-        col_names_x = col_names_x + ['params']
+        col_names_x = [col for col in self.df if col.startswith('in') or col.startswith('op') or col.startswith('dataset')]
+        col_names_x = col_names_x + ['params', 'layers']
         col_names_y = ['test_acc']
-        self.split_dataset(col_names_x, col_names_y)
+        self.split_dataset(col_names_x, col_names_y, random_seed=self.args.random_seed)
 
         # model training
         params = {
@@ -66,13 +66,14 @@ class ML_model:
         df_list = []
         for each_file_name in self.args.data:
             df_file_path = os.path.join('nas_bench_graph', 'save_df', each_file_name + '.pkl')
-            if os.path.exists(df_file_path):
+            if (not self.args.reload) and os.path.exists(df_file_path):
                 df = pd.read_pickle(df_file_path)
             else:
                 # contruct dataframe
                 bench = light_read(each_file_name)
                 print(f"for dataset {each_file_name}, bench information is {bench[list(bench.keys())[0]].keys()}")
-                df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3', 'params', 'latency', 'test_acc'])
+                df = pd.DataFrame(columns=['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3', 'params', 
+                'latency', 'test_acc', 'layers', 'dataset_nodes', 'dataset_edges', 'dataset_feats', 'dataset_types'])
                 for key_idx in tqdm(bench):
                     info = bench[key_idx]
                     structure = key2structure(key_idx)
@@ -82,6 +83,11 @@ class ML_model:
 
                     bench_sample = [info['para'], info['latency'], info['perf']]
                     sample += bench_sample
+
+                    sample.append(max(structure[0]) + 1)
+                    
+                    dataset_sample = dataset2info(each_file_name)
+                    sample += dataset_sample
 
                     df.loc[df.shape[0]] = sample
                 df.to_pickle(df_file_path)
@@ -133,6 +139,7 @@ class ML_model:
         self.result = [r2, mse]
 
     def plot_feat_importance(self, feat_names, plot_save_path='importance.png', feat_num=5):
+        plot_save_path = '_'.join(self.args.data) + '_importance.png'
         feat_important = self.model.feature_importances_
 
         zipped_list = zip(feat_important, feat_names)

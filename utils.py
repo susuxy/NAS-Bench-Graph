@@ -58,3 +58,24 @@ def key2structure(bench_key):
     ops2 = gidx2gnn[bench_key // 10 - bench_key // 100 * 10]
     ops3 = gidx2gnn[bench_key // 1 - bench_key // 10 * 10]
     return [link_structure, [ops0, ops1, ops2, ops3]]
+
+
+def dataset2info(dataset_name):
+    if dataset_name.startswith('arxiv'):
+        return [169343, 1166243, 128, 40]
+    elif dataset_name.startswith('citeseer'):
+        return [3327, 4732, 3703, 6]
+    elif dataset_name.startswith('computers'):
+        return [13381, 245778, 767, 10]
+    elif dataset_name.startswith('cora'):
+        return [2708, 5429, 1433, 7]
+    elif dataset_name.startswith('cs'):
+        return [18333, 81894, 6805, 15]
+    elif dataset_name.startswith('photo'):
+        return [7487, 119043, 745, 8]
+    elif dataset_name.startswith('physics'):
+        return [34493, 247962, 8415, 5]
+    elif dataset_name.startswith('proteins'):
+        return [132534, 39561252, 8, 112]
+    elif dataset_name.startswith('pubmed'):
+        return [19717, 44338, 500, 3]
