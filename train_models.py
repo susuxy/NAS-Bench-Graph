@@ -13,26 +13,37 @@ from sklearn.metrics import r2_score, mean_squared_error
 import matplotlib.pyplot as plt
 import time
 from scipy import stats
+from sklearn.utils import shuffle
 
 class ML_model:
     def __init__(self, args):
         self.args = args
+        self.args.data = sorted(self.args.data)
+        self.args.train_data = sorted(self.args.train_data)
+        self.args.test_data = sorted(self.args.test_data)
         self.log_initialize()
         
     def log_initialize(self):
-        log_file_name = '_'.join(self.args.data)
+        if self.args.train_mode == 'normal':
+            log_file_name = '_'.join(self.args.data) + '.log'
+        elif self.args.train_mode == 'data_transfer':
+            log_file_name = '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '.log'
+        log_file_path = os.path.join('log_file', log_file_name)
 
         logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        handler = logging.FileHandler(log_file_name + '.log')
+        handler = logging.FileHandler(log_file_path)
         self.logger.addHandler(handler)
-        with open(log_file_name + '.log', 'w') as f:
+        with open(log_file_path, 'w') as f:
             pass
         self.logger.info(self.args)
 
     def run(self, category_col_names):
-        # read data
-        self.read_data()
+        if self.args.train_mode == 'normal':
+            # read data
+            self.read_data(self.args.data)
+        elif self.args.train_mode == 'data_transfer':
+            self.read_data_datatransfer()
 
         # encode category variables
         if self.args.encode == 'category':
@@ -45,7 +56,10 @@ class ML_model:
         # col_names_x = [col for col in self.df if col.startswith('in') or col.startswith('op')]
         col_names_x = col_names_x + ['params', 'layers']
         col_names_y = ['test_acc']
-        self.split_dataset(col_names_x, col_names_y, random_seed=self.args.random_seed)
+        if self.args.train_mode == 'normal':
+            self.split_dataset(col_names_x, col_names_y, random_seed=self.args.random_seed)
+        elif self.args.train_mode == 'data_transfer':
+            self.split_dataset_datatransfer(col_names_x, col_names_y)
 
         # model training
         params = {
@@ -62,11 +76,20 @@ class ML_model:
         # feature importances
         self.plot_feat_importance(col_names_x)
 
+    def read_data_datatransfer(self):
+        self.train_df = self.read_data(self.args.train_data, dataset_name='train')
+        self.test_df = self.read_data(self.args.test_data, dataset_name='test')
+        shuffle(self.train_df)
+        shuffle(self.test_df)
+        self.df = pd.concat([self.train_df, self.test_df])
+        self.train_size = self.train_df.shape[0]
+        self.test_size = self.test_df.shape[0]
 
 
-    def read_data(self):
+
+    def read_data(self, dataset_list, dataset_name='total'):
         df_list = []
-        for each_file_name in self.args.data:
+        for each_file_name in dataset_list:
             df_file_path = os.path.join('nas_bench_graph', 'save_df', each_file_name + '.pkl')
             if (not self.args.reload) and os.path.exists(df_file_path):
                 df = pd.read_pickle(df_file_path)
@@ -97,8 +120,9 @@ class ML_model:
         
         df = pd.concat(df_list)
         self.df = df
-        self.logger.info(f"total dataframe column names {df.columns}")
-        self.logger.info(f"total dataframe size is {df.shape}")
+        self.logger.info(f"{dataset_name} dataframe column names {df.columns}")
+        self.logger.info(f"{dataset_name} dataframe size is {df.shape}")
+        return df
 
     def category_label_encode(self, col_names):
         # category label encoding
@@ -114,6 +138,18 @@ class ML_model:
 
     def one_hot_label_encode(self, col_names):
         self.df = pd.get_dummies(self.df, prefix = col_names, columns=col_names)
+
+    def split_dataset_datatransfer(self, feat_col_name, pred_col_name):
+        train_set = self.df.iloc[:self.train_size, :]
+        test_set = self.df.iloc[self.train_size:, :]
+        assert test_set.shape[0] == self.test_size
+        self.X_train = train_set[feat_col_name]
+        self.y_train = train_set[pred_col_name]
+        self.X_test = test_set[feat_col_name]
+        self.y_test = test_set[pred_col_name]
+
+        self.logger.info(f"training data size for X and y is {self.X_train.shape} and {self.y_train.shape}")
+        self.logger.info(f"testing data size for X and y is {self.X_test.shape} and {self.y_test.shape}")
 
     def split_dataset(self, feat_col_name, pred_col_name, test_size=0.2, random_seed=13):
 
@@ -143,8 +179,12 @@ class ML_model:
 
     def plot_rank_spearman(self):
         x,y = self.y_pred, self.y_test
-        score_path = os.path.join('spearman_plot', '_'.join(self.args.data) + '_score.png')
-        rank_path = os.path.join('spearman_plot', '_'.join(self.args.data) + '_rank.png')
+        if self.args.train_mode == 'normal':
+            score_path = os.path.join('spearman_plot', '_'.join(self.args.data) + '_score.png')
+            rank_path = os.path.join('spearman_plot', '_'.join(self.args.data) + '_rank.png')
+        elif self.args.train_mode == 'data_transfer':
+            score_path = os.path.join('spearman_plot', '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '_score.png')
+            rank_path = os.path.join('spearman_plot', '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '_rank.png')
         rank_x = stats.rankdata(x)
         rank_y = stats.rankdata(y)
         spearman_corr, pvalue = stats.spearmanr(rank_x, rank_y)
@@ -165,7 +205,10 @@ class ML_model:
         self.logger.info(f"Spearman corr is {spearman_corr}, num_samples is {len(rank_x)}")
 
     def plot_feat_importance(self, feat_names, feat_num=5):
-        plot_save_path = '_'.join(self.args.data) + '_importance.png'
+        if self.args.train_mode == 'normal':
+            plot_save_path = os.path.join('importance_plot', '_'.join(self.args.data) + '_importance.png')
+        elif self.args.train_mode == 'data_transfer':
+            plot_save_path = os.path.join('importance_plot', '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '_importance.png')
         feat_important = self.model.feature_importances_
 
         zipped_list = zip(feat_important, feat_names)
