@@ -80,8 +80,16 @@ class ML_model:
     def read_data_datatransfer(self):
         self.train_df = self.read_data(self.args.train_data, dataset_name='train')
         self.test_df = self.read_data(self.args.test_data, dataset_name='test')
-        shuffle(self.train_df)
-        shuffle(self.test_df)
+        self.train_df = shuffle(self.train_df)
+        self.test_df = shuffle(self.test_df)
+        self.test_df = self.test_df.iloc[:20965, :]
+        if self.args.data_leak > 0:
+            fetch_num = int(self.args.data_leak / 100 * len(self.test_df))
+            fetch_df = self.test_df.iloc[:fetch_num, :]
+            self.train_df = pd.concat([self.train_df, fetch_df])
+            self.train_df = shuffle(self.train_df)
+            self.test_df = self.test_df.iloc[fetch_num:, :]
+
         self.df = pd.concat([self.train_df, self.test_df])
         self.train_size = self.train_df.shape[0]
         self.test_size = self.test_df.shape[0]
