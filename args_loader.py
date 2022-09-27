@@ -11,5 +11,7 @@ def load_args():
     parser.add_argument('--train_mode', choices=['normal', 'data_transfer'], default='normal', type=str)
     parser.add_argument('--train_data', nargs='*', type=str, default=['citeseer', 'computers', 'cora', 'cs', 'photo', 'physics', 'proteins', 'pubmed'])
     parser.add_argument('--test_data', nargs='*', type=str, default=['arxiv'])
+
+    parser.add_argument('--percentage_overlap', default=10, type=int)
     args = parser.parse_known_args()[0]
     return args

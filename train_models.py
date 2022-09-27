@@ -1,4 +1,5 @@
 import os
+from tkinter import Y
 from tracemalloc import start
 import pandas as pd
 import numpy as np
@@ -171,11 +172,29 @@ class ML_model:
     def model_results(self):
         self.model_testing()
         self.plot_rank_spearman()
+        overlap_top = self.overlap_top(self.args.percentage_overlap)
         r2 = r2_score(self.y_test, self.y_pred)
+        # r2 = self.model.score(self.X_test.values, self.y_test.values)
         mse = mean_squared_error(self.y_test, self.y_pred)
+        self.logger.info(f"top {self.args.percentage_overlap} % overlap {overlap_top:.7f}")
         self.logger.info(f"R2 score {r2:.7f}")
         self.logger.info(f"MSE score {mse:.7f}")
         self.result = [r2, mse]
+
+    def overlap_top(self, percent=10):
+        num_top10 = len(self.rank_x) // percent
+        zipped_list = zip(self.rank_x, self.rank_y)
+        sort_zip = sorted(zipped_list)
+        tuples = zip(*sort_zip)
+        rank_x_sort, rank_y_sort = [list(t) for t in tuples]
+
+        pred_y_sort = rank_y_sort[:num_top10]
+        count = 0
+        for element in pred_y_sort:
+            if element <= num_top10:
+                count += 1
+        return count / num_top10
+
 
     def plot_rank_spearman(self):
         x,y = self.y_pred, self.y_test
@@ -185,9 +204,12 @@ class ML_model:
         elif self.args.train_mode == 'data_transfer':
             score_path = os.path.join('spearman_plot', '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '_score.png')
             rank_path = os.path.join('spearman_plot', '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '_rank.png')
-        rank_x = stats.rankdata(x)
-        rank_y = stats.rankdata(y)
-        spearman_corr, pvalue = stats.spearmanr(rank_x, rank_y)
+        self.rank_x = stats.rankdata(x, method='min')
+        self.rank_y = stats.rankdata(y, method='min')
+        spearman_corr, pvalue = stats.spearmanr(self.rank_x, self.rank_y)
+        # pearson_corr, p_value = stats.pearsonr(self.rank_x, self.rank_y)
+        # print(f"pearson correlation of scores {pearson_corr}")
+
 
         plt.figure()
         plt.scatter(x, y, s=2)
@@ -197,12 +219,12 @@ class ML_model:
         plt.savefig(score_path)
 
         plt.figure()
-        plt.scatter(rank_x, rank_y, s=2)
+        plt.scatter(self.rank_x, self.rank_y, s=2)
         plt.xlabel("rank_y_pred")
         plt.ylabel("rank_y_true")
         plt.show()
         plt.savefig(rank_path)
-        self.logger.info(f"Spearman corr is {spearman_corr}, num_samples is {len(rank_x)}")
+        self.logger.info(f"Spearman corr is {spearman_corr}, num_samples is {len(self.rank_x)}")
 
     def plot_feat_importance(self, feat_names, feat_num=5):
         if self.args.train_mode == 'normal':
