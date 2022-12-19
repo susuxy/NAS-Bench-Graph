@@ -62,16 +62,35 @@ class ML_model:
         elif self.args.train_mode == 'data_transfer':
             self.split_dataset_datatransfer(col_names_x, col_names_y)
 
-        # model training
-        params = {
-            "n_estimators": 500,
-            "max_depth": 4,
-        }
-        start_time = time.time()
-        self.model_training(params)
-        self.logger.info(f"model training time is {time.time() - start_time}")
+        
+        if self.args.xgb_incremental:
+            # model training
+            params = {
+                "max_depth": 4,
+            }
+            num_boost_train = 490
+            num_boost_incre = 10
+            start_time = time.time()
+            self.incre_model_training(params, num_boost_train, num_boost_incre)
+            self.logger.info(f"model training time is {time.time() - start_time}")
 
-        # model testing
+            # model testing
+            self.incre_model_testing()
+
+        else:
+            # model training
+            params = {
+                "n_estimators": 500,
+                "max_depth": 4,
+            }
+            start_time = time.time()
+            self.model_training(params)
+            self.logger.info(f"model training time is {time.time() - start_time}")
+
+            # model testing
+            self.model_testing()
+        
+        # model performances
         self.model_results()
 
         # feature importances
@@ -81,18 +100,27 @@ class ML_model:
         self.train_df = self.read_data(self.args.train_data, dataset_name='train')
         self.test_df = self.read_data(self.args.test_data, dataset_name='test')
         self.train_df = shuffle(self.train_df)
-        self.test_df = shuffle(self.test_df)
-        self.test_df = self.test_df.iloc[:20965, :]
+        self.test_df = shuffle(self.test_df, random_state=self.args.test_split_random_seed)
+        # self.test_df = self.test_df.iloc[:20965, :]
         if self.args.data_leak > 0:
             fetch_num = int(self.args.data_leak / 100 * len(self.test_df))
             fetch_df = self.test_df.iloc[:fetch_num, :]
-            self.train_df = pd.concat([self.train_df, fetch_df])
-            self.train_df = shuffle(self.train_df)
+            if self.args.xgb_incremental:
+                self.train_df_incre = fetch_df
+            else:
+                self.train_df = pd.concat([self.train_df, fetch_df])
+                self.train_df = shuffle(self.train_df)
             self.test_df = self.test_df.iloc[fetch_num:, :]
 
-        self.df = pd.concat([self.train_df, self.test_df])
-        self.train_size = self.train_df.shape[0]
-        self.test_size = self.test_df.shape[0]
+        if self.args.xgb_incremental:
+            self.df = pd.concat([self.train_df, self.train_df_incre, self.test_df])
+            self.train_size = self.train_df.shape[0]
+            self.train_incre_size = self.train_df_incre.shape[0]
+            self.test_size = self.test_df.shape[0]
+        else:
+            self.df = pd.concat([self.train_df, self.test_df])
+            self.train_size = self.train_df.shape[0]
+            self.test_size = self.test_df.shape[0]
 
 
 
@@ -149,16 +177,39 @@ class ML_model:
         self.df = pd.get_dummies(self.df, prefix = col_names, columns=col_names)
 
     def split_dataset_datatransfer(self, feat_col_name, pred_col_name):
-        train_set = self.df.iloc[:self.train_size, :]
-        test_set = self.df.iloc[self.train_size:, :]
-        assert test_set.shape[0] == self.test_size
-        self.X_train = train_set[feat_col_name]
-        self.y_train = train_set[pred_col_name]
-        self.X_test = test_set[feat_col_name]
-        self.y_test = test_set[pred_col_name]
-
-        self.logger.info(f"training data size for X and y is {self.X_train.shape} and {self.y_train.shape}")
-        self.logger.info(f"testing data size for X and y is {self.X_test.shape} and {self.y_test.shape}")
+        if self.args.xgb_incremental:
+            train_set = self.df.iloc[:self.train_size, :]
+            train_incre_set = self.df.iloc[self.train_size:(self.train_size + self.train_incre_size), :]
+            test_set = self.df.iloc[(self.train_size + self.train_incre_size):, :]
+            X_train = train_set[feat_col_name]
+            y_train = train_set[pred_col_name]
+            X_train_incre = train_incre_set[feat_col_name]
+            y_train_incre = train_incre_set[pred_col_name]
+            X_test = test_set[feat_col_name]
+            y_test = test_set[pred_col_name]
+            self.dtrain = xgboost.DMatrix(data=X_train.values,
+                                    feature_names=X_train.columns,
+                                    label=y_train.values)
+            self.dtrain_incre = xgboost.DMatrix(data=X_train_incre.values,
+                                    feature_names=X_train_incre.columns,
+                                    label=y_train_incre.values)
+            self.dtest = xgboost.DMatrix(data=X_test.values,
+                                    feature_names=X_test.columns,
+                                    label=y_test.values)
+            self.y_test = self.dtest.get_label()
+            self.logger.info(f"training data size for X and y is {X_train.shape} and {y_train.shape}")
+            self.logger.info(f"incremental training data size for X and y is {X_train_incre.shape} and {y_train_incre.shape}")
+            self.logger.info(f"testing data size for X and y is {X_test.shape} and {y_test.shape}")
+        else:
+            train_set = self.df.iloc[:self.train_size, :]
+            test_set = self.df.iloc[self.train_size:, :]
+            assert test_set.shape[0] == self.test_size
+            self.X_train = train_set[feat_col_name]
+            self.y_train = train_set[pred_col_name]
+            self.X_test = test_set[feat_col_name]
+            self.y_test = test_set[pred_col_name]
+            self.logger.info(f"training data size for X and y is {self.X_train.shape} and {self.y_train.shape}")
+            self.logger.info(f"testing data size for X and y is {self.X_test.shape} and {self.y_test.shape}")
 
     def split_dataset(self, feat_col_name, pred_col_name, test_size=0.2, random_seed=13):
 
@@ -170,6 +221,13 @@ class ML_model:
         self.logger.info(f"training data size for X and y is {self.X_train.shape} and {self.y_train.shape}")
         self.logger.info(f"testing data size for X and y is {self.X_test.shape} and {self.y_test.shape}")
 
+    def incre_model_training(self, params, num_boost_train, num_boost_incre):
+        self.model = xgboost.train(params, self.dtrain, num_boost_round=num_boost_train)
+        self.model = xgboost.train(params, self.dtrain_incre, num_boost_round=num_boost_incre, xgb_model=self.model)
+    
+    def incre_model_testing(self):
+        self.y_pred = self.model.predict(self.dtest)
+
     def model_training(self, params):
         self.model = xgboost.XGBRegressor(**params)
         self.model.fit(self.X_train.values, self.y_train.values)
@@ -178,7 +236,6 @@ class ML_model:
         self.y_pred = self.model.predict(self.X_test.values)
 
     def model_results(self):
-        self.model_testing()
         self.plot_rank_spearman()
         overlap_top = self.overlap_top(self.args.percentage_overlap)
         r2 = r2_score(self.y_test, self.y_pred)
@@ -239,7 +296,12 @@ class ML_model:
             plot_save_path = os.path.join('importance_plot', '_'.join(self.args.data) + '_importance.png')
         elif self.args.train_mode == 'data_transfer':
             plot_save_path = os.path.join('importance_plot', '_'.join(self.args.train_data) + '__' + '_'.join(self.args.test_data) + '_importance.png')
-        feat_important = self.model.feature_importances_
+        
+        if self.args.xgb_incremental:
+            feat_important = self.model.get_score(importance_type='gain')
+            feat_important = [feat_important[x] if x in feat_important else 0 for x in feat_names]
+        else:
+            feat_important = self.model.feature_importances_
 
         zipped_list = zip(feat_important, feat_names)
         sorted_zip_list = sorted(zipped_list, reverse=True)
