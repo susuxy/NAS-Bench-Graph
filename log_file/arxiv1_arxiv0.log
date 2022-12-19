@@ -1,0 +1,11 @@
+Namespace(data=['arxiv1', 'arxiv0'], encode='one_hot', data_type='complete')
+total dataframe column names Index(['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3',
+       'params', 'latency', 'test_acc'],
+      dtype='object')
+total dataframe size is (52412, 11)
+training data size for X and y is (41929, 47) and (41929, 1)
+testing data size for X and y is (10483, 47) and (10483, 1)
+model training time is 5.543525695800781
+R2 score 0.7194313
+MSE score 0.0002747
+5 most important features ['in_2_2', 'op_1_gin', 'op_1_graph', 'in_3_0', 'op_0_graph']

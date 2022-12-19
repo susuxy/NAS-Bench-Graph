@@ -1,0 +1,14 @@
+Namespace(data=['proteins'], encode='one_hot', data_type='complete', reload=False, random_seed=13, train_mode='normal', train_data=['arxiv', 'citeseer', 'computers', 'cora', 'cs', 'photo', 'physics', 'proteins', 'pubmed'], test_data=['pubmed'], percentage_overlap=10)
+total dataframe column names Index(['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3',
+       'params', 'latency', 'test_acc', 'layers', 'dataset_nodes',
+       'dataset_edges', 'dataset_feats', 'dataset_types'],
+      dtype='object')
+total dataframe size is (2021, 16)
+training data size for X and y is (1616, 36) and (1616, 1)
+testing data size for X and y is (405, 36) and (405, 1)
+model training time is 2.251542806625366
+Spearman corr is 0.7591487063320455, num_samples is 405
+top 10 % overlap 0.7000000
+R2 score 0.6208219
+MSE score 0.0000698
+5 most important features ['in_3_0', 'op_3_gcn', 'op_1_gcn', 'in_2_2', 'in_2_1']

@@ -1,0 +1,19 @@
+Namespace(data=['arxiv', 'citeseer', 'computers', 'cora', 'cs', 'photo', 'physics', 'proteins', 'pubmed'], encode='one_hot', data_type='complete', reload=False, random_seed=13, train_mode='data_transfer', train_data=['arxiv', 'citeseer', 'computers', 'cora', 'cs', 'photo', 'physics', 'proteins', 'pubmed'], test_data=['arxiv'], percentage_overlap=10, data_leak=0.1)
+train dataframe column names Index(['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3',
+       'params', 'latency', 'test_acc', 'layers', 'dataset_nodes',
+       'dataset_edges', 'dataset_feats', 'dataset_types'],
+      dtype='object')
+train dataframe size is (211669, 16)
+test dataframe column names Index(['in_0', 'in_1', 'in_2', 'in_3', 'op_0', 'op_1', 'op_2', 'op_3',
+       'params', 'latency', 'test_acc', 'layers', 'dataset_nodes',
+       'dataset_edges', 'dataset_feats', 'dataset_types'],
+      dtype='object')
+test dataframe size is (26206, 16)
+training data size for X and y is (211695, 52) and (211695, 1)
+testing data size for X and y is (26180, 52) and (26180, 1)
+model training time is 14.046288013458252
+Spearman corr is 0.8120732017021536, num_samples is 26180
+top 10 % overlap 0.6684492
+R2 score 0.6915561
+MSE score 0.0002531
+5 most important features ['dataset_edges', 'dataset_feats', 'dataset_types', 'in_1_0', 'in_2_2']
